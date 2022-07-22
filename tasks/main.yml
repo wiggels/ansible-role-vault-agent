@@ -1,0 +1,86 @@
+---
+- name: Looking up latest version of Vault
+  ansible.builtin.set_fact:
+    vault_version: "{{ (lookup('url', 'https://api.github.com/repos/hashicorp/vault/releases/latest', split_lines=False) |
+                    from_json).get('tag_name') | replace('v', '') }}"
+  when: 'vault_version == "latest"'
+
+- name: Include checks/asserts
+  ansible.builtin.import_tasks: asserts.yml
+
+- name: Add Vault group
+  become: true
+  ansible.builtin.group:
+    name: "{{ vault_group }}"
+    state: present
+  when: vault_manage_group | bool
+
+- name: Add Vault user
+  become: true
+  ansible.builtin.user:
+    name: "{{ vault_user }}"
+    comment: "Vault user"
+    group: "{{ vault_group }}"
+    groups: "{{ vault_groups }}"
+    system: true
+  when: vault_manage_user | bool
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - "{{ ansible_os_family }}{{ ansible_distribution_major_version }}.yml"
+        - "{{ ansible_os_family }}.yml"
+      paths:
+        - vars
+
+- name: Check Vault installation
+  ansible.builtin.shell: command -v vault
+  environment:
+    PATH: "{{ vault_bin_path }}:{{ ansible_env.PATH }}"
+  register: vault_installation
+  changed_when: false
+  ignore_errors: true
+  check_mode: false
+  tags:
+    - skip_ansible_lint  # command is a shell builtin
+
+- name: Get installed Vault version
+  ansible.builtin.shell: |
+    set -o pipefail
+    {{ vault_installation.stdout }} -version | cut -d' ' -f2 | tr -d 'v'
+  args:
+    executable: /bin/bash
+  when: not vault_installation is failed
+  changed_when: false
+  check_mode: false
+  register: installed_vault_version
+
+- name: Compute if installation is required
+  ansible.builtin.set_fact:
+    installation_required: "{{ vault_installation is failed or installed_vault_version.stdout != vault_version }}"
+
+- name: Install OS packages and Vault via control host
+  include: install.yml
+  when:
+    - not vault_enterprise | bool
+    - not vault_install_remotely | bool
+    - not vault_install_hashi_repo | bool
+    - installation_required | bool
+
+- name: Install Vault via HashiCorp repository
+  include: install_hashi_repo.yml
+  when:
+    - not vault_enterprise | bool
+    - not vault_install_remotely | bool
+    - vault_install_hashi_repo | bool
+    - installation_required | bool
+
+- name: Install OS packages and Vault via remote hosts
+  include: install_remote.yml
+  when:
+    - not vault_enterprise | bool
+    - vault_install_remotely | bool
+    - not vault_install_hashi_repo | bool
+    - installation_required | bool

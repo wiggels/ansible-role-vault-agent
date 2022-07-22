@@ -1,0 +1,12 @@
+---
+# Supported *nix distributions
+_vault_nix_distros:
+  - 'RedHat'
+  - 'CentOS'
+  - 'Fedora'
+  - 'Debian'
+  - 'Ubuntu'
+  - 'Archlinux'
+  - 'OracleLinux'
+  - 'Flatcar'
+  - 'FreeBSD'

@@ -1,0 +1,34 @@
+- name: Check distribution compatibility
+  ansible.builtin.fail:
+    msg: "{{ ansible_distribution }} is not supported by this role"
+  when:
+    - ansible_distribution not in _vault_nix_distros
+    - ansible_os_family != 'Windows'
+
+- name: Fail if not a new release of Red Hat / CentOS
+  ansible.builtin.fail:
+    msg: "{{ ansible_distribution_version }} is not a supported version of {{ ansible_distribution }} for this role"
+  when:
+    - ansible_distribution in ['RedHat', 'CentOS']
+    - ansible_distribution_version is version(7, '<')
+
+- name: Fail if not a new release of Debian
+  ansible.builtin.fail:
+    msg: "{{ ansible_distribution_version }} is not a supported version of {{ ansible_distribution }} for this role"
+  when:
+    - ansible_distribution == "Debian"
+    - (ansible_distribution_version != 'buster/sid') and (ansible_distribution_version is version(8.5, '<'))
+
+- name: Fail if not a new release of FreeBSD
+  ansible.builtin.fail:
+    msg: "{{ ansible_distribution_version }} is not a supported version."
+  when:
+    - ansible_distribution == "FreeBSD"
+    - ansible_distribution_version is version(10, '<')
+
+- name: Fail if not a new release of Ubuntu
+  ansible.builtin.fail:
+    msg: "{{ ansible_distribution_version }} is not a supported version of {{ ansible_distribution }} for this role"
+  when:
+    - ansible_distribution == "Ubuntu"
+    - ansible_distribution_version is version(13.04, '<')
